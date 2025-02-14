@@ -56,7 +56,7 @@ if __name__ == "__main__":
 	
 	# connect to Valon:
 	myValon = Valon(port="/dev/ttyAMA4",baud=115200)
-	myValon.set_freq(args.valon_freq * 1000)
+	myValon.set_freq(args.valon_freq/6 * 1000)
 	print(f"Frequency of the Valon set to {args.valon_freq * 1000}MHz")
 	
 	time.sleep(45) # wait for pm stabilization
