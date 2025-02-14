@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 sys.path.insert(0, "/home/polocalc/Documents/lab_test_scripts/remote_Keithley") # add the path for the Keithley script
-sys.path.insert(0, "/home/polocalc/Documents/lab_test_scripts/remote_PM5B/base-pyPM5-0.0.4/") # add the path for the PM5B script
+sys.path.insert(0, "/home/polocalc/Documents/lab_test_scripts/remote_PM5B") # add the path for the PM5B script
 sys.path.insert(0, "/home/polocalc/Documents/porter/porter") # add the path for the valon
 
 from pyKeithley import myKeithley
@@ -29,10 +29,12 @@ if __name__ == "__main__":
 	N_tens = int(len(np.arange(min_tens,max_tens,tens_step)))+1
 	
 	# connect to the Keithley power supply:
+	'''
 	rm = pyvisa.ResourceManager()
 	addr = rm.list_resources() # USB0 is the top USB port in RPy, USB1 is the bottom one
+	'''
 	ps = myKeithley()
-	ps.connect(addr[0])
+	ps.connect("ASRL/dev/ttyUSB1::INSTR")
 
 	# connect to the PM5B power meter
 	pm=PM5()
