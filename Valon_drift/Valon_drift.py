@@ -8,14 +8,14 @@ from valon import Valon
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser()
-	parser.add_argument("-f", "--valon-freq",help="Ouput frequency of the Valon (GHz)",type=float,default=93)
-	parser.add_argument("-p", "--valon-pwr",help="Valon output power (dBm)",type=float,default=2)
+	parser.add_argument("-f", "--valon-freq",help="Ouput frequency of the Valon (GHz)",type=float,default=90)
+	parser.add_argument("-p", "--valon-pwr",help="Valon output power (dBm)",type=float,default=-6.5)
 	parser.add_argument("-d","--time-duration",help="Time duration of the data acquisition (s)",type=int,default=10)
 	parser.add_argument("-s","--time-step",help="Time step between two measures (s)",type=float,default=2)
 	args = parser.parse_args()
 	
 	myVal = Valon(port="/dev/ttyAMA4",baud=115200)
-	myVal.set_freq(args.valon_freq * 1000) 
+	myVal.set_freq(args.valon_freq/6 * 1000) 
 	myVal.set_pwr(args.valon_pwr)
 	
 	temp = []
