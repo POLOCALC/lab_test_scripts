@@ -31,7 +31,7 @@ if __name__ == "__main__":
 		time.sleep(args.time_step)
 	
 	now = datetime.now()
-	file_name = f"{now.strftime('%Y_%m_%d_%H_%M_%S')}_{args.valon_freq}GHz"
+	file_name = f"{now.strftime('%Y_%m_%d_%H_%M_%S')}_{args.valon_freq}GHz.txt"
 	
 	f = open(file_name,"w")
 	f.write(f"{now.strftime('%Y/%m/%d %H:%M:%S')} \n")
