@@ -18,7 +18,10 @@ class myKeithley:
 	def print_settings(self):
 		print(f"Current Channels settings: \n Ch1: {self.Ch1_settings} \n Ch2: {self.Ch2_settings} \n Ch3: {self.Ch3_settings} ")
 		print(f"Current output state: {self.output_state}")
-		return
+		
+		
+	def return_settings(self):
+		return f"Current Channels settings: \n Ch1: {self.Ch1_settings} \n Ch2: {self.Ch2_settings} \n Ch3: {self.Ch3_settings}"
 		
 	def connect(self,COMport):
 		"""Connect device using COM port
