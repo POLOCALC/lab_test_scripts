@@ -15,6 +15,15 @@ from pyKeithley import myKeithley
 from pyPM5 import PM5
 from valon import Valon
 
+def get_pm_pwr(init_time=time.time(),N_it=100,time_vec=[],pwr_vec=[]):
+	count = 0
+	while(count<N_it):
+		pwr_vec.append(pm.read_power()*1e3)
+		time_vec.append(time.time()-init_time)
+		count+=1
+	
+	return time_vec,pwr_vec
+
 if __name__ == "__main__":
 	
 	parser = argparse.ArgumentParser()
@@ -102,7 +111,7 @@ if __name__ == "__main__":
 	log_file.write(f"Multiplier output frequency (GHz): {args.valon_freq}\n\n")
 	log_file.write(f"Valon output frequency (MHz): {myValon.get_freq()}\n\n")
 	log_file.write(f"Valon output power (dBm): {myValon.get_pwr()}\n\n")
-	log.file_write(f"Valon modulation: OFF \n\n")
+	log_file.write(f"Valon modulation: OFF \n\n")
 	log_file.write(f"Keithley channels: {ps.return_settings()}\n\n")
 	log_file.write(f"Upper sweep tension (V): {max_tens}\n")
 	log_file.write(f"Lower sweep tension (V): {min_tens}\n")
@@ -118,6 +127,7 @@ if __name__ == "__main__":
 	stabil_file.write(f"time(s)				pwr(mW)	\n")
 	
 	#read the first 100 data:
+	'''
 	count=0
 	time_arr = []
 	pwr_arr = []
@@ -127,6 +137,9 @@ if __name__ == "__main__":
 		pwr_arr.append(pm.read_power()*1e3)
 		time_arr.append(time.time()-init_time)
 		count+=1
+	'''
+	init_time = time.time()
+	time_arr,pwr_arr = get_pm_pwr(init_time=init_time)
 	
 	pwr_comparison = [p for p in pwr_arr if p!=-np.inf]
 	
@@ -135,17 +148,19 @@ if __name__ == "__main__":
 	
 	print(f"avg pwr: {avg_stab}")
 	print(f"std pwr: {std_stab}")
-	print(f"goal: {1/2000*avg_stab}")
+	print(f"goal: {1/1000*avg_stab}")
 	
 	# cycle to check if the pwr is stabilized:
 	i=1 
-	while(std_stab>1/2000*avg_stab):
-		
+	while(std_stab>1/1000*avg_stab):
+		'''
 		count = 0
 		while(count<100):
 			pwr_arr.append(pm.read_power()*1e3)
 			time_arr.append(time.time()-init_time)
 			count+=1
+		'''
+		time_arr,pwr_arr = get_pm_pwr(init_time=init_time,time_vec=time_arr,pwr_vec=pwr_arr)
 		
 		pwr_comparison = pwr_arr[-100:]
 		pwr_comparison = [p for p in pwr_comparison if p!=-np.inf]
@@ -157,7 +172,7 @@ if __name__ == "__main__":
 			print(f"time past: {time_arr[-1]}s")
 			print(f"avg pwr: {avg_stab}")
 			print(f"std pwr: {std_stab}")
-			print(f"goal: {1/2000*avg_stab}")
+			print(f"goal: {1/1000*avg_stab}")
 			i+=1
 	
 	for t,p in zip(time_arr,pwr_arr):
@@ -183,6 +198,7 @@ if __name__ == "__main__":
 		print("measuring the power...")
 		
 		# acquire data
+		'''
 		count=0
 		time_plot = []
 		power = []
@@ -193,12 +209,16 @@ if __name__ == "__main__":
 			power.append(pm.read_power()*1000)
 			time_plot.append(time.time()-time_in)
 			count+=1
+		'''
+		time_plot,power = get_pm_pwr(init_time=time.time(),N_it=100,time_vec=[],pwr_vec=[])
 
+		'''
 		time_end = time.time()
 
 		timeit = time_end-time_in
 		print(f"single sweep measure took {timeit} s")
-	
+		'''
+		
 		plt.plot(time_plot,power)
 		plt.xlabel('time [s]')
 		plt.ylabel('Power [W]')
