@@ -169,7 +169,7 @@ if __name__ == "__main__":
 	
 	print(f"avg pwr: {avg_stab}")
 	print(f"std pwr: {std_stab}")
-	frac_avg_goal = 1/1000*avg_stab
+	frac_avg_goal = 1/2000*avg_stab
 	print(f"goal: {frac_avg_goal}")
 	
 	# cycle to check if the pwr is stabilized:
@@ -183,7 +183,7 @@ if __name__ == "__main__":
 		
 		avg_stab = np.mean(pwr_comparison)
 		std_stab = np.std(pwr_comparison)
-		frac_avg_goal = 1/1000*avg_stab
+		frac_avg_goal = 1/2000*avg_stab
 		
 		if(time_arr[-1]>60*(5*i)):
 			print(f"time past: {time_arr[-1]}s")
