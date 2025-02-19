@@ -6,25 +6,32 @@ import pyvisa
 from datetime import datetime
 import numpy as np
 import matplotlib.pyplot as plt
+import yaml
+import logging
 
 sys.path.insert(0, "/home/polocalc/Documents/lab_test_scripts/remote_Keithley") # add the path for the Keithley script
 sys.path.insert(0, "/home/polocalc/Documents/lab_test_scripts/remote_PM5B") # add the path for the PM5B script
 sys.path.insert(0, "/home/polocalc/Documents/porter/porter") # add the path for the valon
+sys.path.insert(0, "/home/polocalc/Documents/porter/porter/sensors") # path for the adc
 
 from pyKeithley import myKeithley
 from pyPM5 import PM5
 from valon import Valon
+import ads1015 as ads
 
-def get_pm_pwr(init_time=time.time(),N_it=100,time_vec=[],pwr_vec=[]):
+def read_pm_adc(init_time=time.time(),N_it=100,time_vec=[],pwr_vec=[],adc_vec=[]):
 	count = 0
 	while(count<N_it):
 		pwr_vec.append(pm.read_power()*1e3)
+		adc_vec.append(adc.read()*1e3)
 		time_vec.append(time.time()-init_time)
 		count+=1
 	
-	return time_vec,pwr_vec
+	return time_vec,pwr_vec,adc_vec
 
 if __name__ == "__main__":
+	
+	# initialization -------------------------------------------------------------------------------------------------------------------------
 	
 	parser = argparse.ArgumentParser()
 	parser.add_argument("-V", "--tension-res", help="Tension resolution (V)", type=float, default=0.1)
@@ -71,7 +78,9 @@ if __name__ == "__main__":
 	else:
 		print("Invalid power meter range")
 		exit()
-		
+	
+	# connection and configuration of instruments: -------------------------------------------------------------------------------------------------------
+	
 	# connect to the PM5B power meter
 	pm=PM5()
 	pm.connect('USB0::1027::24577::856V::0::RAW')
@@ -105,7 +114,28 @@ if __name__ == "__main__":
 	myValon.set_pwr(-6.5)
 	myValon.stop_amd()
 	
-	# create the log file
+	# configure the adc:
+	cfg_filename = "/home/polocalc/Documents/porter/config/test_configs/adc_test_resp_config.yml"
+	
+	with open(cfg_filename, "r") as cfg:
+		config = yaml.safe_load(cfg)
+		logging.info(f"Loaded configuration {cfg_filename}")
+		
+	cfg.close()
+        	
+	adc_params = config["sensors"]["ADC_1"]
+		
+	adc = ads.ADS1015(adc_params["connection"]["parameters"]["channels"],
+					  address=adc_params["connection"]["parameters"]["address"],
+				      bus=adc_params["connection"]["parameters"]["bus"],
+					  mode=adc_params["connection"]["parameters"]["mode"],
+					  name=adc_params["name"],
+					  )
+					  
+	adc.configure(adc_params["configuration"])
+	
+	# create the log file -------------------------------------------------------------------------------------------------------------------------
+	
 	log_file_name = f"{dir_name}/log_file.txt"
 	log_file = open(log_file_name,"w")
 	log_file.write(f"Multiplier output frequency (GHz): {args.valon_freq}\n\n")
@@ -118,28 +148,19 @@ if __name__ == "__main__":
 	log_file.write(f"Sweep tension step (V): {tens_step}\n")
 	log_file.close()
 	
-	# wait for the stabilization of the power:
+	# wait for the stabilization of the power: ----------------------------------------------------------------------------------------------------
+	
 	print(f"wait for stabiization...")
 	
 	# create the file
 	stabil_file_name = f"{dir_name}/pwr_stabilization.txt"
 	stabil_file = open(stabil_file_name,"a")
-	stabil_file.write(f"time(s)				pwr(mW)	\n")
+	stabil_file.write(f"time(s)				pwr(mW)				adc(mV)	\n")
 	
 	#read the first 100 data:
-	'''
-	count=0
-	time_arr = []
-	pwr_arr = []
-	init_time = time.time()
 	
-	while(count<100):
-		pwr_arr.append(pm.read_power()*1e3)
-		time_arr.append(time.time()-init_time)
-		count+=1
-	'''
 	init_time = time.time()
-	time_arr,pwr_arr = get_pm_pwr(init_time=init_time)
+	time_arr,pwr_arr,adc_arr = read_pm_adc(init_time=init_time)
 	
 	pwr_comparison = [p for p in pwr_arr if p!=-np.inf]
 	
@@ -148,42 +169,40 @@ if __name__ == "__main__":
 	
 	print(f"avg pwr: {avg_stab}")
 	print(f"std pwr: {std_stab}")
-	print(f"goal: {1/1000*avg_stab}")
+	frac_avg_goal = 1/1000*avg_stab
+	print(f"goal: {frac_avg_goal}")
 	
 	# cycle to check if the pwr is stabilized:
 	i=1 
-	while(std_stab>1/1000*avg_stab):
-		'''
-		count = 0
-		while(count<100):
-			pwr_arr.append(pm.read_power()*1e3)
-			time_arr.append(time.time()-init_time)
-			count+=1
-		'''
-		time_arr,pwr_arr = get_pm_pwr(init_time=init_time,time_vec=time_arr,pwr_vec=pwr_arr)
+	while(std_stab>frac_avg_goal):
+		
+		time_arr,pwr_arr,adc_arr = read_pm_adc(init_time=init_time,time_vec=time_arr,pwr_vec=pwr_arr,adc_vec=adc_arr)
 		
 		pwr_comparison = pwr_arr[-100:]
 		pwr_comparison = [p for p in pwr_comparison if p!=-np.inf]
 		
 		avg_stab = np.mean(pwr_comparison)
 		std_stab = np.std(pwr_comparison)
+		frac_avg_goal = 1/1000*avg_stab
 		
 		if(time_arr[-1]>60*(5*i)):
 			print(f"time past: {time_arr[-1]}s")
 			print(f"avg pwr: {avg_stab}")
 			print(f"std pwr: {std_stab}")
-			print(f"goal: {1/1000*avg_stab}")
+			print(f"goal: {frac_avg_goal}")
 			i+=1
 	
-	for t,p in zip(time_arr,pwr_arr):
-		stabil_file.write(f"{t}		{p}	\n")
+	for t,p,V in zip(time_arr,pwr_arr,adc_arr):
+		stabil_file.write(f"{t}		{p}		{V} \n")
 	
 	stabil_file.close()
+	
+	# voltage sweep ---------------------------------------------------------------------------------------------------------------------------------------
 	
 	voltage_sweep_dir = f"{dir_name}/Voltage_sweep"
 	os.mkdir(voltage_sweep_dir)
 		
-	# start the voltage sweep
+	# start the voltage sweep 
 	for ch3_tens in ps_tensions:
 		
 		tens_file_name = f"{voltage_sweep_dir}/{'{:.2f}'.format(ch3_tens)}V.txt"
@@ -198,36 +217,25 @@ if __name__ == "__main__":
 		print("measuring the power...")
 		
 		# acquire data
-		'''
-		count=0
-		time_plot = []
-		power = []
-
-		time_in = time.time()
 		
-		while(count<100):
-			power.append(pm.read_power()*1000)
-			time_plot.append(time.time()-time_in)
-			count+=1
-		'''
-		time_plot,power = get_pm_pwr(init_time=time.time(),N_it=100,time_vec=[],pwr_vec=[])
-
-		'''
-		time_end = time.time()
-
-		timeit = time_end-time_in
-		print(f"single sweep measure took {timeit} s")
-		'''
+		time_plot,power,adc_tension = read_pm_adc(init_time=time.time(),N_it=100,time_vec=[],pwr_vec=[],adc_vec=[])
 		
-		plt.plot(time_plot,power)
-		plt.xlabel('time [s]')
-		plt.ylabel('Power [W]')
+		fig,ax = plt.subplots(nrows=1,ncols=2,figsize=(16,7))
+		
+		ax[0].plot(time_plot,power)
+		ax[0].set_xlabel('time [s]')
+		ax[0].set_ylabel('Power [mW]')
+		
+		ax[1].plot(time_plot,adc_tension)
+		ax[1].set_xlabel('time [s]')
+		ax[1].set_ylabel('ADC tension [mV]')
+		
 		plt.show()
 		
-		for t,p in zip(time_plot,power):
-			tens_file.write(f"{t}		{p}	\n")
+		for t,p,V in zip(time_plot,power,adc_tension):
+			tens_file.write(f"{t}		{p}		{V}	\n")
 		
-		pwr_thres = pm_ranges[pm_range_idx-2] - pm_ranges[pm_range_idx-2]*20/100
+		pwr_thres = pm_ranges[pm_range_idx-2] - pm_ranges[pm_range_idx-2]*10/100
 		
 		if(np.mean(power)<pwr_thres):
 			pm_range_idx = pm_range_idx-1
@@ -235,8 +243,14 @@ if __name__ == "__main__":
 			time.sleep(30)
 
 	tens_file.close()
+	
+	# disconnection ----------------------------------------------------------------------------------------------------------------------------------
+	
 	# switch off the ps output
 	ps.switch_off_output() 
+	
+	# close the adc
+	adc.close()
 	
 	# close the connection with the Keithley power supply
 	ps.close()
