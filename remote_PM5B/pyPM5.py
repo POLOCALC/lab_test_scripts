@@ -185,7 +185,7 @@ class PM5:
         count_value = struct.unpack('<h', bytes([LSB_byte,MSB_byte]))[0]
         
         # calculate reading:
-        reading = count_value * 2.0 * range_set / 59576
+        reading = count_value * 2.0 * range_set *1e3 / 59576
         
         # apply cal factor if present:
         if cal_factor != 0:
