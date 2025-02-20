@@ -8,8 +8,9 @@ Created on Mon Sep  4 15:51:44 2023
 import copy
 import numpy as np
 import time
+import struct
 
-class PM5:
+class PM5_neg:
     """ A class that wraps the pyvisa object and allows for automatic power readings and
     range changes. The "powermeter" object contains the original pyvisa object that is used for
     communication. The read_power function basically sends a write/read command and interprets the returned information.
@@ -72,8 +73,7 @@ class PM5:
 
     def read_power(self):
         """ Returns the a single reading in units of watts, and updates
-        range_setting and cal_factor properties. Note that currently the conversion assumes a positive reading, as
-        it uses unsigned integers
+        range_setting and cal_factor properties.
         """
         ACK = 0x06  # acknowledged
         NAK = 0x015  # not acknowledged
@@ -139,32 +139,6 @@ class PM5:
         else:
                 print('Wrong comunication with PM5')
                 return -np.inf
-                
-        #print(data_string)
-        
-        '''
-        attempts = 0
-        while identifier_byte != 68 and attempts < 3:
-            print("Read request failed, clearing buffer")
-            try:
-                self.powermeter.read_bytes(100)
-            except Exception as e:
-                print("Buffer cleared")
-                self.powermeter.write("?D10000\r")
-                data_string = self.powermeter.read_bytes(7)
-                parse_check_byte = out_string[2]
-                identifier_byte = data_string[0]
-                LSB_byte = data_string[1]
-                MSB_byte = data_string[2]
-                status_byte_1 = data_string[3]
-                status_byte_2 = data_string[4]
-                status_byte_3 = data_string[5]
-                attempts += 1  # times out if
-
-        if attempts > 3:
-            print("Maximum number of attempted data reads reached. Read failed: exiting function")
-            return None
-        '''
         
         status_byte_3_in_bits = format(status_byte_3, '#010b')[2:]
         range_binary = status_byte_3_in_bits[:3]
@@ -188,17 +162,17 @@ class PM5:
         #print(f"range binary = {range_binary}")
         #print(f"range setting = {range_setting}")
         self.range_setting = self.ranges[range_index-1]
-        cal_factor_bits = format(status_byte_2, '#010b')[2:]
-        cal_factor_ones = int(cal_factor_bits[0:4], base=2)
-        cal_factor_decimals = int(cal_factor_bits[4:8], base=2)
-        cal_factor_tens = int(status_byte_3_in_bits[4:8], base=2)
-        if status_byte_3_in_bits[3] == 1:
-            cal_factor_sign = -1
-        else:
-            cal_factor_sign = 1
-        cal_factor = cal_factor_sign * 10 * cal_factor_tens + cal_factor_ones + 0.1 * cal_factor_decimals
-        self.cal_factor = cal_factor
-        # print(f"cal factor:{cal_factor}")
+        
+        range_value = status_byte_1 & 0x03
+        range_sets = {
+                        1: 200e-6,# 200uW
+                        2: 2e-3,  # 2mW
+                        3: 20e-3, # 20mW
+                        4: 200e-3# 200mW
+                        
+                      }
+                      
+        range_set = range_sets.get(range_value,0)
         
         auto_range = format(status_byte_1, '#010b')[2:][0]
         if auto_range == 1:
@@ -206,16 +180,22 @@ class PM5:
         else:
             self.auto_range = "Not in auto range"
         
-        #cal_byte = format(status_byte_1, '#010b')[2:][4:7] # cal heater byte -> it always look at the phisical position of the knob, no matter which cal heater is setted from software
+        # get cal factor from status byte 3 (bits 0-5)
+        cal_factor = status_byte_3 & 0x3F
+        if cal_factor > 9: # convert from 6-bit two's complement
+                cal_factor -= 64
+        self.cal_factor = cal_factor
         
-        #self.print_settings()
+        # convert LSB and MSB to signed 16-bit value using struct:
+        count_value = struct.unpack('<h', bytes([LSB_byte,MSB_byte]))[0]
         
-        count_value = LSB_byte + MSB_byte * 256
-        reading = count_value * 2.0 * range_setting / 59576
-
+        # calculate reading:
+        reading = count_value * 2.0 * range_set / 59576
+        
+        # apply cal factor if present:
         if cal_factor != 0:
-            reading = reading * 10 ** (cal_factor / 10)
-
+                reading = reading * 10**(cal_factor/10)
+        
         return reading
     
     def set_zero(self):
