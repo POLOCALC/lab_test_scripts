@@ -10,7 +10,7 @@ import numpy as np
 import time
 import struct
 
-class PM5_neg:
+class PM5:
     """ A class that wraps the pyvisa object and allows for automatic power readings and
     range changes. The "powermeter" object contains the original pyvisa object that is used for
     communication. The read_power function basically sends a write/read command and interprets the returned information.
