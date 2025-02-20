@@ -20,6 +20,9 @@ from valon import Valon
 import ads1015 as ads
 
 def read_pm_adc(init_time=time.time(),N_it=100,time_vec=[],pwr_vec=[],adc_vec=[]):
+	"""
+		Returns the power measured by power meter in mW, the tension of the diode in mV and the time needed to perform both the measurements
+	"""
 	count = 0
 	while(count<N_it):
 		pwr_vec.append(pm.read_power()*1e3)
@@ -37,8 +40,9 @@ if __name__ == "__main__":
 	parser.add_argument("-V", "--tension-res", help="Tension resolution (V)", type=float, default=0.1)
 	parser.add_argument("-l","--lower-tens",help="Lower limit on tension (V)",type=float,default=0.1)
 	parser.add_argument("-u","--upper-tens",help="Upper limit on tension (V)",type=float,default=5)
-	parser.add_argument("-f", "--valon-freq", help="Ouput frequency of the Valon (GHz)",type=float,default=93)
-	parser.add_argument("-r", "--power-range",help="Power range of the power meter (mW)",type=float,default=200)
+	parser.add_argument("-f","--valon-freq", help="Ouput frequency of the Valon (GHz)",type=float,default=93)
+	parser.add_argument("-r","--power-range",help="Power range of the power meter (mW)",type=float,default=200)
+	parser.add_argument("-p","--plot",help="Plot the measures",type=bool,default=False)
 	args = parser.parse_args()
 	
 	# create the folder to store data:
@@ -113,6 +117,7 @@ if __name__ == "__main__":
 	print(f"Frequency of the Valon set to {myValon.get_freq()}MHz")
 	myValon.set_pwr(-6.5)
 	myValon.stop_amd()
+	print(f"Valon modulation: {myValon.get_amd()}")
 	
 	# configure the adc:
 	cfg_filename = "/home/polocalc/Documents/porter/config/test_configs/adc_test_resp_config.yml"
@@ -169,7 +174,7 @@ if __name__ == "__main__":
 	
 	print(f"avg pwr: {avg_stab}")
 	print(f"std pwr: {std_stab}")
-	frac_avg_goal = 1/2000*avg_stab
+	frac_avg_goal = 1/1000*avg_stab
 	print(f"goal: {frac_avg_goal}")
 	
 	# cycle to check if the pwr is stabilized:
@@ -183,7 +188,7 @@ if __name__ == "__main__":
 		
 		avg_stab = np.mean(pwr_comparison)
 		std_stab = np.std(pwr_comparison)
-		frac_avg_goal = 1/2000*avg_stab
+		frac_avg_goal = 1/1000*avg_stab
 		
 		if(time_arr[-1]>60*(5*i)):
 			print(f"time past: {time_arr[-1]}s")
@@ -220,27 +225,85 @@ if __name__ == "__main__":
 		
 		time_plot,power,adc_tension = read_pm_adc(init_time=time.time(),N_it=100,time_vec=[],pwr_vec=[],adc_vec=[])
 		
-		fig,ax = plt.subplots(nrows=1,ncols=2,figsize=(16,7))
+		# change the pm range if needed, skip if the range is already 200uW
+		if not (pm_ranges[pm_range_idx-1]==0.2):
 		
-		ax[0].plot(time_plot,power)
-		ax[0].set_xlabel('time [s]')
-		ax[0].set_ylabel('Power [mW]')
+			pwr_thres = pm_ranges[pm_range_idx-2] - pm_ranges[pm_range_idx-2]*10/100
 		
-		ax[1].plot(time_plot,adc_tension)
-		ax[1].set_xlabel('time [s]')
-		ax[1].set_ylabel('ADC tension [mV]')
+			if(np.mean(power)<pwr_thres):
+				pm_range_idx = pm_range_idx-1
+				pm.set_range(pm_range_idx,1) 
+				time.sleep(30)
 		
-		plt.show()
+		# if the pwr is negative:
+		if(any((p<0) and (p!=-np.inf) for p in power)):
+			
+			print("Measured a negative power: starting the dedicated procedure")
+			
+			time_init_neg = time.time()
+			
+			# 1st iteration
+			ps.switch_off_output()  
+			time.sleep(45)	# wait for stabilization 
+			time_neg,pwr_neg,adc_neg = read_pm_adc(init_time=time_init_neg,N_it=30,time_vec=[],pwr_vec=[],adc_vec=[]) # read the zero (no pwr) level
+			
+			ps.switch_on_output() 
+			time.sleep(5)
+	
+			# connect to Valon:
+			myValon = Valon(port="/dev/ttyAMA4",baud=115200)
+			myValon.set_freq(args.valon_freq/6 * 1000)
+			myValon.set_pwr(-6.5)
+			print(f"Valon set to {myValon.get_freq()}, {myValon.get_pwr()} ")
+			myValon.stop_amd()
+			
+			time.sleep(45)	# wait for stabilization 
+			time_neg,pwr_neg,adc_neg = read_pm_adc(init_time=time_init_neg,N_it=30,time_vec=time_neg,pwr_vec=pwr_neg,adc_vec=adc_neg) # read the pwr on level
+			
+			it=1
+			while(it<5): # iterate 5 times
+				
+				ps.switch_off_output()  
+				time.sleep(45)	# wait for stabilization 
+				time_neg,pwr_neg,adc_neg = read_pm_adc(init_time=time_init_neg,N_it=30,time_vec=time_neg,pwr_vec=pwr_neg,adc_vec=adc_neg) # read the zero (no pwr) level
+			
+				ps.switch_on_output() 
+				time.sleep(5)
+				
+				# connect to Valon:
+				myValon = Valon(port="/dev/ttyAMA4",baud=115200)
+				myValon.set_freq(args.valon_freq/6 * 1000)
+				myValon.set_pwr(-6.5)
+				print(f"Valon set to {myValon.get_freq()}, {myValon.get_pwr()} ")
+				myValon.stop_amd()
+				
+				time.sleep(45)	# wait for stabilization 
+				time_neg,pwr_neg,adc_neg = read_pm_adc(init_time=time_init_neg,N_it=30,time_vec=time_neg,pwr_vec=pwr_neg,adc_vec=adc_neg) # read the pwr on level
+				
+				it+=1
+			
+			
+			for t,p,V in zip(time_neg,pwr_neg,adc_neg):
+				tens_file.write(f"{t}		{p}		{V}	\n")
+			
+		else:
+			for t,p,V in zip(time_plot,power,adc_tension):
+				tens_file.write(f"{t}		{p}		{V}	\n")
+				
+				
+		if args.plot:
+			fig,ax = plt.subplots(nrows=1,ncols=2,figsize=(16,7))
 		
-		for t,p,V in zip(time_plot,power,adc_tension):
-			tens_file.write(f"{t}		{p}		{V}	\n")
+			ax[0].plot(time_plot,power)
+			ax[0].set_xlabel('time [s]')
+			ax[0].set_ylabel('Power [mW]')
 		
-		pwr_thres = pm_ranges[pm_range_idx-2] - pm_ranges[pm_range_idx-2]*10/100
+			ax[1].plot(time_plot,adc_tension)
+			ax[1].set_xlabel('time [s]')
+			ax[1].set_ylabel('ADC tension [mV]')
 		
-		if(np.mean(power)<pwr_thres):
-			pm_range_idx = pm_range_idx-1
-			pm.set_range(pm_range_idx,1) 
-			time.sleep(30)
+			plt.show()
+			
 
 	tens_file.close()
 	
