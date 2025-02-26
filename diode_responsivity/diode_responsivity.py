@@ -90,7 +90,7 @@ if __name__ == "__main__":
 	pm.connect('USB0::1027::24577::856V::0::RAW')
 	
 	# PM5B settings:	
-	pm.set_range(pm_range_idx,1) 
+	pm.set_range(4,1) # initially at 200mW for stabilization
 	time.sleep(10) # wait for the change of channel
 	pm.set_zero()
 	time.sleep(10) # wait for the stabilization
@@ -174,7 +174,7 @@ if __name__ == "__main__":
 	
 	print(f"avg pwr: {avg_stab}")
 	print(f"std pwr: {std_stab}")
-	frac_avg_goal = 1/1000*avg_stab
+	frac_avg_goal = 1/2000*avg_stab
 	print(f"goal: {frac_avg_goal}")
 	
 	# cycle to check if the pwr is stabilized:
@@ -188,7 +188,7 @@ if __name__ == "__main__":
 		
 		avg_stab = np.mean(pwr_comparison)
 		std_stab = np.std(pwr_comparison)
-		frac_avg_goal = 1/1000*avg_stab
+		frac_avg_goal = 1/2000*avg_stab
 		
 		if(time_arr[-1]>60*(5*i)):
 			print(f"time past: {time_arr[-1]}s")
@@ -206,6 +206,9 @@ if __name__ == "__main__":
 	
 	voltage_sweep_dir = f"{dir_name}/Voltage_sweep"
 	os.mkdir(voltage_sweep_dir)
+	
+	# set the pm range:
+	pm.set_range(pm_range_idx,1)
 		
 	# start the voltage sweep 
 	for ch3_tens in ps_tensions:
@@ -229,8 +232,10 @@ if __name__ == "__main__":
 		if not (pm_ranges[pm_range_idx-1]==0.2):
 		
 			pwr_thres = pm_ranges[pm_range_idx-2] - pm_ranges[pm_range_idx-2]*10/100
+			print(f"avg pwr: {np.mean(power[power!=np.inf])}")
+			print(f"pwr_thresh: {pwr_thres}")
 		
-			if(np.mean(power)<pwr_thres):
+			if(np.mean(power[power!=np.inf])<pwr_thres):
 				pm_range_idx = pm_range_idx-1
 				pm.set_range(pm_range_idx,1) 
 				time.sleep(30)
@@ -245,7 +250,7 @@ if __name__ == "__main__":
 			# 1st iteration
 			ps.switch_off_output()  
 			time.sleep(45)	# wait for stabilization 
-			time_neg,pwr_neg,adc_neg = read_pm_adc(init_time=time_init_neg,N_it=30,time_vec=[],pwr_vec=[],adc_vec=[]) # read the zero (no pwr) level
+			time_neg,pwr_neg,adc_neg = read_pm_adc(init_time=time_init_neg,N_it=50,time_vec=[],pwr_vec=[],adc_vec=[]) # read the zero (no pwr) level
 			
 			ps.switch_on_output() 
 			time.sleep(5)
@@ -258,14 +263,14 @@ if __name__ == "__main__":
 			myValon.stop_amd()
 			
 			time.sleep(45)	# wait for stabilization 
-			time_neg,pwr_neg,adc_neg = read_pm_adc(init_time=time_init_neg,N_it=30,time_vec=time_neg,pwr_vec=pwr_neg,adc_vec=adc_neg) # read the pwr on level
+			time_neg,pwr_neg,adc_neg = read_pm_adc(init_time=time_init_neg,N_it=50,time_vec=time_neg,pwr_vec=pwr_neg,adc_vec=adc_neg) # read the pwr on level
 			
 			it=1
 			while(it<5): # iterate 5 times
 				
 				ps.switch_off_output()  
 				time.sleep(45)	# wait for stabilization 
-				time_neg,pwr_neg,adc_neg = read_pm_adc(init_time=time_init_neg,N_it=30,time_vec=time_neg,pwr_vec=pwr_neg,adc_vec=adc_neg) # read the zero (no pwr) level
+				time_neg,pwr_neg,adc_neg = read_pm_adc(init_time=time_init_neg,N_it=50,time_vec=time_neg,pwr_vec=pwr_neg,adc_vec=adc_neg) # read the zero (no pwr) level
 			
 				ps.switch_on_output() 
 				time.sleep(5)
@@ -278,7 +283,7 @@ if __name__ == "__main__":
 				myValon.stop_amd()
 				
 				time.sleep(45)	# wait for stabilization 
-				time_neg,pwr_neg,adc_neg = read_pm_adc(init_time=time_init_neg,N_it=30,time_vec=time_neg,pwr_vec=pwr_neg,adc_vec=adc_neg) # read the pwr on level
+				time_neg,pwr_neg,adc_neg = read_pm_adc(init_time=time_init_neg,N_it=50,time_vec=time_neg,pwr_vec=pwr_neg,adc_vec=adc_neg) # read the pwr on level
 				
 				it+=1
 			
