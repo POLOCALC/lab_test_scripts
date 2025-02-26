@@ -156,18 +156,9 @@ class PM5:
             range_index = 4
         #print(f"range binary = {range_binary}")
         #print(f"range setting = {range_setting}")
-        self.range_setting = self.ranges[range_index-1]
         
-        range_value = status_byte_1 & 0x03
-        range_sets = {
-                        1: 200e-6,# 200uW
-                        2: 2e-3,  # 2mW
-                        3: 20e-3, # 20mW
-                        4: 200e-3# 200mW
-                        
-                      }
-                      
-        range_set = range_sets.get(range_value,0)
+        
+        self.range_setting = self.ranges[range_index-1]
         
         auto_range = format(status_byte_1, '#010b')[2:][0]
         if auto_range == 1:
@@ -175,22 +166,26 @@ class PM5:
         else:
             self.auto_range = "Not in auto range"
         
-        # get cal factor from status byte 3 (bits 0-5)
-        cal_factor = status_byte_3 & 0x3F
-        if cal_factor > 9: # convert from 6-bit two's complement
-                cal_factor -= 64
+        cal_factor_bits = format(status_byte_2, '#010b')[2:]
+        cal_factor_ones = int(cal_factor_bits[0:4], base=2)
+        cal_factor_decimals = int(cal_factor_bits[4:8], base=2)
+        cal_factor_tens = int(status_byte_3_in_bits[4:8], base=2)
+        if status_byte_3_in_bits[3] == 1:
+            cal_factor_sign = -1
+        else:
+            cal_factor_sign = 1
+        cal_factor = cal_factor_sign * 10 * cal_factor_tens + cal_factor_ones + 0.1 * cal_factor_decimals
         self.cal_factor = cal_factor
         
         # convert LSB and MSB to signed 16-bit value using struct:
         count_value = struct.unpack('<h', bytes([LSB_byte,MSB_byte]))[0]
         
         # calculate reading:
-        reading = count_value * 2.0 * range_set *1e3 / 59576
+        reading = count_value * 2.0 * range_setting / 59576
         
-        # apply cal factor if present:
         if cal_factor != 0:
-                reading = reading * 10**(cal_factor/10)
-        
+            reading = reading * 10 ** (cal_factor / 10)
+            
         return reading
     
     def set_zero(self):
