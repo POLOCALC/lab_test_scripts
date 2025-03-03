@@ -43,6 +43,7 @@ if __name__ == "__main__":
 	parser.add_argument("-f","--valon-freq", help="Ouput frequency of the Valon (GHz)",type=float,default=93)
 	parser.add_argument("-r","--power-range",help="Power range of the power meter (mW)",type=float,default=200)
 	parser.add_argument("-p","--plot",help="Plot the measures",type=bool,default=False)
+	parser.add_argument("-d", "--diode", help="diode used for measurements", type=str, default="hp")
 	args = parser.parse_args()
 	
 	# create the folder to store data:
@@ -82,6 +83,13 @@ if __name__ == "__main__":
 	else:
 		print("Invalid power meter range")
 		exit()
+		
+	# check the diode name is correct:
+	if((args.diode=="hp") or (args.diode=="vdi") or (args.diode=="eravant")):
+		print(f"using {args.diode} diode")
+	else:
+		print("Invalid diode name")
+		exit()
 	
 	# connection and configuration of instruments: -------------------------------------------------------------------------------------------------------
 	
@@ -120,24 +128,26 @@ if __name__ == "__main__":
 	print(f"Valon modulation: {myValon.get_amd()}")
 	
 	# configure the adc:
-	cfg_filename = "/home/polocalc/Documents/porter/config/test_configs/adc_test_resp_config.yml"
+	if(args.diode=="hp"):
+		config_gain = 16
+		config_dr = 1600
+	elif(args.diode=="vdi"):
+		config_gain = 16
+		config_dr = 1600
+	elif(args.diode=="eravant"):
+		config_gain = 16
+		config_dr = 1600
 	
-	with open(cfg_filename, "r") as cfg:
-		config = yaml.safe_load(cfg)
-		logging.info(f"Loaded configuration {cfg_filename}")
-		
-	cfg.close()
-        	
-	adc_params = config["sensors"]["ADC_1"]
-		
-	adc = ads.ADS1015(adc_params["connection"]["parameters"]["channels"],
-					  address=adc_params["connection"]["parameters"]["address"],
-				      bus=adc_params["connection"]["parameters"]["bus"],
-					  mode=adc_params["connection"]["parameters"]["mode"],
-					  name=adc_params["name"],
+	adc_params = {'gain': config_gain, 'data_rate': config_dr}
+        			
+	adc = ads.ADS1015(channel=[0,1],
+					  address=0x48,
+				      bus=6,
+					  mode="differential",
+					  name="ADS1015",
 					  )
 					  
-	adc.configure(adc_params["configuration"])
+	adc.configure(adc_params)
 	
 	# create the log file -------------------------------------------------------------------------------------------------------------------------
 	
@@ -209,6 +219,8 @@ if __name__ == "__main__":
 	
 	# set the pm range:
 	pm.set_range(pm_range_idx,1)
+	
+	neg_pwr_meas = False
 		
 	# start the voltage sweep 
 	for ch3_tens in ps_tensions:
@@ -241,7 +253,7 @@ if __name__ == "__main__":
 				time.sleep(30)
 		
 		# if the pwr is negative:
-		if(any((p<0) and (p!=-np.inf) for p in power)):
+		if(np.any(power[power!=-np.inf]<0)):
 			
 			print("Measured a negative power: starting the dedicated procedure")
 			
