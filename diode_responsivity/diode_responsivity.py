@@ -41,6 +41,7 @@ if __name__ == "__main__":
 	parser.add_argument("-l","--lower-tens",help="Lower limit on tension (V)",type=float,default=0.1)
 	parser.add_argument("-u","--upper-tens",help="Upper limit on tension (V)",type=float,default=5)
 	parser.add_argument("-f","--valon-freq", help="Ouput frequency of the Valon (GHz)",type=float,default=93)
+	parser.add_argument("-a","--valon-pwr", help="Ouput power of the Valon (dBm)",type=float,default=1)
 	parser.add_argument("-r","--power-range",help="Power range of the power meter (mW)",type=float,default=200)
 	parser.add_argument("-p","--plot",help="Plot the measures",type=bool,default=False)
 	parser.add_argument("-d", "--diode", help="diode used for measurements", type=str, default="hp")
@@ -48,7 +49,7 @@ if __name__ == "__main__":
 	
 	# create the folder to store data:
 	now = datetime.now()
-	dir_name = f"/home/polocalc/Documents/lab_test_scripts/diode_responsivity/{now.strftime('%Y_%m_%d_%H_%M_%S')}_{args.valon_freq}GHz"
+	dir_name = f"/home/polocalc/Documents/lab_test_scripts/diode_responsivity/{now.strftime('%Y_%m_%d_%H_%M_%S')}_{args.valon_freq}GHz_{args.diode}"
 	os.mkdir(dir_name)
 	
 	# define max and min values for the tension applied to the multiplier attenuator and the step:
@@ -123,7 +124,8 @@ if __name__ == "__main__":
 	print(f"setting Valon freq to: {args.valon_freq/6 * 1000}")
 	myValon.set_freq(args.valon_freq/6 * 1000)
 	print(f"Frequency of the Valon set to {myValon.get_freq()}MHz")
-	myValon.set_pwr(-6.5)
+	myValon.set_pwr(args.valon_pwr)
+	print(f"Valon pwr: {myValon.get_pwr()}")
 	myValon.stop_amd()
 	print(f"Valon modulation: {myValon.get_amd()}")
 	
@@ -270,7 +272,7 @@ if __name__ == "__main__":
 			# connect to Valon:
 			myValon = Valon(port="/dev/ttyAMA4",baud=115200)
 			myValon.set_freq(args.valon_freq/6 * 1000)
-			myValon.set_pwr(-6.5)
+			myValon.set_pwr(args.valon_pwr)
 			print(f"Valon set to {myValon.get_freq()}, {myValon.get_pwr()} ")
 			myValon.stop_amd()
 			
@@ -290,7 +292,7 @@ if __name__ == "__main__":
 				# connect to Valon:
 				myValon = Valon(port="/dev/ttyAMA4",baud=115200)
 				myValon.set_freq(args.valon_freq/6 * 1000)
-				myValon.set_pwr(-6.5)
+				myValon.set_pwr(args.valon_pwr)
 				print(f"Valon set to {myValon.get_freq()}, {myValon.get_pwr()} ")
 				myValon.stop_amd()
 				
